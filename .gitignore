@@ -1,0 +1,6 @@
+node_modules/
+# tsc output (rebuilt by `npm run build` / before every project:deploy)
+src/FileCabinet/SuiteScripts/ar-invoice-sender/**/*.js
+# SuiteCloud CLI account credentials / project settings
+project.json
+.suitecloud-sdk/

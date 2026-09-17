@@ -1,0 +1,18 @@
+<massupdatescript scriptid="customscript_ar_optin_mu">
+  <description>Custom mass update that checks Auto-Send Open Invoices (custentity_ar_send_invoices) on every customer matching the criteria. Run once after deployment to opt in existing customers; new customers get the box checked by default.</description>
+  <isinactive>F</isinactive>
+  <name>AR Invoice Sender - Opt In Customers</name>
+  <notifyadmins>F</notifyadmins>
+  <notifyowner>T</notifyowner>
+  <scriptfile>[/SuiteScripts/ar-invoice-sender/ar_optin_customers_mu.js]</scriptfile>
+  <scriptdeployments>
+    <scriptdeployment scriptid="customdeploy_ar_optin_mu">
+      <allroles>F</allroles>
+      <audslctrole>ADMINISTRATOR</audslctrole>
+      <isdeployed>T</isdeployed>
+      <loglevel>ERROR</loglevel>
+      <recordtype>CUSTOMER</recordtype>
+      <status>RELEASED</status>
+    </scriptdeployment>
+  </scriptdeployments>
+</massupdatescript>

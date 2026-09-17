@@ -1,0 +1,15 @@
+<manifest projecttype="ACCOUNTCUSTOMIZATION">
+  <projectname>ar-invoice-sender</projectname>
+  <frameworkversion>1.0</frameworkversion>
+  <dependencies>
+    <features>
+      <feature required="true">CRM</feature>
+      <feature required="true">SERVERSIDESCRIPTING</feature>
+      <feature required="true">SUBSIDIARIES</feature>
+    </features>
+    <objects>
+      <!-- Pre-existing in the target account (Electronic Bank Payments bundle); read by the SuiteQL query, never redefined here. -->
+      <object>custentity_2663_email_address_notif</object>
+    </objects>
+  </dependencies>
+</manifest>

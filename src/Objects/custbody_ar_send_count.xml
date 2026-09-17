@@ -1,0 +1,15 @@
+<transactionbodycustomfield scriptid="custbody_ar_send_count">
+  <accesslevel>2</accesslevel>
+  <bodysale>T</bodysale>
+  <checkspelling>F</checkspelling>
+  <description>Number of times this invoice has been emailed by the AR Invoice Sender.</description>
+  <displaytype>NORMAL</displaytype>
+  <fieldtype>INTEGER</fieldtype>
+  <help>Incremented by the AR Invoice Sender after each successful send.</help>
+  <isformula>F</isformula>
+  <ismandatory>F</ismandatory>
+  <label>AR Email Send Count</label>
+  <searchlevel>2</searchlevel>
+  <showinlist>F</showinlist>
+  <storevalue>T</storevalue>
+</transactionbodycustomfield>

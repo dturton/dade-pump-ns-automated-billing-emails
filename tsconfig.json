@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2019",
+    "module": "amd",
+    "moduleResolution": "node",
+    "lib": ["ES2019"],
+    "strict": true,
+    "rootDir": "src/TypeScript",
+    "outDir": "src/FileCabinet/SuiteScripts/ar-invoice-sender",
+    "baseUrl": ".",
+    "paths": {
+      "N/*": ["node_modules/@hitc/netsuite-types/N/*"]
+    },
+    "types": [],
+    "removeComments": false,
+    "newLine": "lf",
+    "skipLibCheck": true
+  },
+  "include": ["src/TypeScript/**/*.ts"]
+}

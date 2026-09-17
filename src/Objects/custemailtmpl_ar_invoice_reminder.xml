@@ -1,0 +1,11 @@
+<emailtemplate scriptid="custemailtmpl_ar_invoice_reminder">
+  <addcompanyaddress>F</addcompanyaddress>
+  <addunsubscribelink>F</addunsubscribelink>
+  <description>Customer-facing email sent by the AR Invoice Sender. Supported merge tokens: {{customerName}}, {{subsidiaryName}}, {{invoiceTable}}.</description>
+  <isinactive>F</isinactive>
+  <isprivate>F</isprivate>
+  <name>AR Open Invoice Reminder</name>
+  <recordtype>ENTITY</recordtype>
+  <subject>Open invoices from {{subsidiaryName}} for {{customerName}}</subject>
+  <usesmedia>F</usesmedia>
+</emailtemplate>

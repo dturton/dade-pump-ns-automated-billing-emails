@@ -1,0 +1,21 @@
+<suitelet scriptid="customscript_ar_invoice_preview_sl">
+  <description>Read-only preview of every invoice the AR Invoice Sender query returns, with today's cadence verdict per invoice. Sends nothing and changes nothing.</description>
+  <isinactive>F</isinactive>
+  <name>AR Invoice Sender Preview</name>
+  <notifyadmins>F</notifyadmins>
+  <notifyowner>T</notifyowner>
+  <scriptfile>[/SuiteScripts/ar-invoice-sender/ar_invoice_preview_sl.js]</scriptfile>
+  <scriptdeployments>
+    <scriptdeployment scriptid="customdeploy_ar_invoice_preview_sl">
+      <allemployees>F</allemployees>
+      <allpartners>F</allpartners>
+      <allroles>F</allroles>
+      <audslctrole>ADMINISTRATOR|ACCOUNTANT|AR_CLERK</audslctrole>
+      <isdeployed>T</isdeployed>
+      <isonline>F</isonline>
+      <loglevel>ERROR</loglevel>
+      <status>RELEASED</status>
+      <title>AR Invoice Sender Preview</title>
+    </scriptdeployment>
+  </scriptdeployments>
+</suitelet>

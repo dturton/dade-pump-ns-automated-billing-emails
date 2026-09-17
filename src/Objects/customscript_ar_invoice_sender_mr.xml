@@ -1,0 +1,134 @@
+<mapreducescript scriptid="customscript_ar_invoice_sender_mr">
+  <description>Emails each opted-in customer's open invoices as PDF attachments: on day 0 (never sent), then at 1, 7, 14 and 30 days overdue, or daily when Send Daily is checked. One email per customer (split only when attachments exceed 15 MB). Sends an internal digest at the end of each run.</description>
+  <isinactive>F</isinactive>
+  <name>AR Invoice Sender</name>
+  <notifyadmins>F</notifyadmins>
+  <notifyowner>T</notifyowner>
+  <scriptfile>[/SuiteScripts/ar-invoice-sender/ar_invoice_sender_mr.js]</scriptfile>
+  <scriptcustomfields>
+    <scriptcustomfield scriptid="custscript_ar_sender_map">
+      <accesslevel>2</accesslevel>
+      <checkspelling>F</checkspelling>
+      <description>JSON object mapping subsidiary internal id to the employee internal id whose name/email the customer sees as the sender.</description>
+      <displaytype>NORMAL</displaytype>
+      <fieldtype>TEXTAREA</fieldtype>
+      <help>Example: {"1": 12, "3": 45} sends invoices of subsidiary 1 from employee 12 and subsidiary 3 from employee 45. Subsidiaries not listed use the Default Sender Employee.</help>
+      <isformula>F</isformula>
+      <ismandatory>F</ismandatory>
+      <label>Sender Map (JSON: subsidiary id to employee id)</label>
+      <searchlevel>2</searchlevel>
+      <storevalue>T</storevalue>
+    </scriptcustomfield>
+    <scriptcustomfield scriptid="custscript_ar_default_sender">
+      <accesslevel>2</accesslevel>
+      <checkspelling>F</checkspelling>
+      <description>Employee used as the email author when the subsidiary is not in the Sender Map. Also sends the internal digest.</description>
+      <displaytype>NORMAL</displaytype>
+      <fieldtype>SELECT</fieldtype>
+      <help>Required. The employee must have a valid email address.</help>
+      <isformula>F</isformula>
+      <ismandatory>F</ismandatory>
+      <label>Default Sender Employee</label>
+      <searchlevel>2</searchlevel>
+      <selectrecordtype>-4</selectrecordtype>
+      <storevalue>T</storevalue>
+    </scriptcustomfield>
+    <scriptcustomfield scriptid="custscript_ar_digest_recipient">
+      <accesslevel>2</accesslevel>
+      <checkspelling>F</checkspelling>
+      <description>Internal email address that receives the run digest (customers sent, skipped for missing billing email, failures).</description>
+      <displaytype>NORMAL</displaytype>
+      <fieldtype>EMAIL</fieldtype>
+      <help>Leave empty to only log the digest in the script execution log.</help>
+      <isformula>F</isformula>
+      <ismandatory>F</ismandatory>
+      <label>Digest Recipient Email</label>
+      <searchlevel>2</searchlevel>
+      <storevalue>T</storevalue>
+    </scriptcustomfield>
+    <scriptcustomfield scriptid="custscript_ar_email_template">
+      <accesslevel>2</accesslevel>
+      <checkspelling>F</checkspelling>
+      <description>Internal id of the customer-facing email template (default: "AR Open Invoice Reminder", custemailtmpl_ar_invoice_reminder).</description>
+      <displaytype>NORMAL</displaytype>
+      <fieldtype>INTEGER</fieldtype>
+      <help>Required. Documents &gt; Templates &gt; Email Templates: open the template and copy the id from the URL.</help>
+      <isformula>F</isformula>
+      <ismandatory>F</ismandatory>
+      <label>Email Template Internal ID</label>
+      <searchlevel>2</searchlevel>
+      <storevalue>T</storevalue>
+    </scriptcustomfield>
+    <scriptcustomfield scriptid="custscript_ar_dry_run">
+      <accesslevel>2</accesslevel>
+      <checkspelling>F</checkspelling>
+      <defaultchecked>T</defaultchecked>
+      <description>When checked, the script logs what it would send and emails the digest, but sends nothing to customers and does not stamp invoices.</description>
+      <displaytype>NORMAL</displaytype>
+      <fieldtype>CHECKBOX</fieldtype>
+      <help>Checked by default on a fresh deployment so nothing goes to customers until the configuration has been reviewed.</help>
+      <isformula>F</isformula>
+      <ismandatory>F</ismandatory>
+      <label>Dry Run</label>
+      <searchlevel>2</searchlevel>
+      <storevalue>T</storevalue>
+    </scriptcustomfield>
+    <scriptcustomfield scriptid="custscript_ar_send_daily">
+      <accesslevel>2</accesslevel>
+      <checkspelling>F</checkspelling>
+      <defaultchecked>F</defaultchecked>
+      <description>When checked, every open invoice is emailed on every run instead of following the day 0 / 1 / 7 / 14 / 30 cadence.</description>
+      <displaytype>NORMAL</displaytype>
+      <fieldtype>CHECKBOX</fieldtype>
+      <help>Ignores the cadence. Invoices already sent today and invoices on hold are still skipped.</help>
+      <isformula>F</isformula>
+      <ismandatory>F</ismandatory>
+      <label>Send Daily (ignore cadence)</label>
+      <searchlevel>2</searchlevel>
+      <storevalue>T</storevalue>
+    </scriptcustomfield>
+    <scriptcustomfield scriptid="custscript_ar_customer">
+      <accesslevel>2</accesslevel>
+      <checkspelling>F</checkspelling>
+      <description>Optional. When set, the run processes only this customer's open invoices. Meant for the manual deployment; leave empty on the daily one.</description>
+      <displaytype>NORMAL</displaytype>
+      <fieldtype>SELECT</fieldtype>
+      <help>Test with one customer: set this on the manual deployment, uncheck Dry Run there, then Save and Execute. Leave empty on the scheduled deployment or the daily run will only email this customer.</help>
+      <isformula>F</isformula>
+      <ismandatory>F</ismandatory>
+      <label>Customer (only this customer)</label>
+      <searchlevel>2</searchlevel>
+      <selectrecordtype>-2</selectrecordtype>
+      <storevalue>T</storevalue>
+    </scriptcustomfield>
+  </scriptcustomfields>
+  <scriptdeployments>
+    <scriptdeployment scriptid="customdeploy_ar_invoice_sender_mr">
+      <buffersize>1</buffersize>
+      <concurrencylimit>1</concurrencylimit>
+      <isdeployed>T</isdeployed>
+      <loglevel>AUDIT</loglevel>
+      <queueallstagesatonce>T</queueallstagesatonce>
+      <recurrence>
+        <daily>
+          <startdate>2026-09-10</startdate>
+          <starttime>07:00:00Z</starttime>
+          <everyxdays>1</everyxdays>
+        </daily>
+      </recurrence>
+      <status>SCHEDULED</status>
+      <title>AR Invoice Sender - daily 7:00 AM</title>
+      <yieldaftermins>60</yieldaftermins>
+    </scriptdeployment>
+    <scriptdeployment scriptid="customdeploy_ar_invoice_sender_manual">
+      <buffersize>1</buffersize>
+      <concurrencylimit>1</concurrencylimit>
+      <isdeployed>T</isdeployed>
+      <loglevel>AUDIT</loglevel>
+      <queueallstagesatonce>T</queueallstagesatonce>
+      <status>NOTSCHEDULED</status>
+      <title>AR Invoice Sender - manual run (set Customer)</title>
+      <yieldaftermins>60</yieldaftermins>
+    </scriptdeployment>
+  </scriptdeployments>
+</mapreducescript>

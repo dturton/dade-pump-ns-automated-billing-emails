@@ -1,0 +1,15 @@
+<transactionbodycustomfield scriptid="custbody_ar_last_sent">
+  <accesslevel>2</accesslevel>
+  <bodysale>T</bodysale>
+  <checkspelling>F</checkspelling>
+  <description>Date this invoice was last emailed by the AR Invoice Sender. Clear it to force a resend on the next run.</description>
+  <displaytype>NORMAL</displaytype>
+  <fieldtype>DATE</fieldtype>
+  <help>Set automatically by the AR Invoice Sender after a successful send. Invoices already stamped with today's date are skipped for the rest of the day.</help>
+  <isformula>F</isformula>
+  <ismandatory>F</ismandatory>
+  <label>AR Email Last Sent</label>
+  <searchlevel>2</searchlevel>
+  <showinlist>F</showinlist>
+  <storevalue>T</storevalue>
+</transactionbodycustomfield>

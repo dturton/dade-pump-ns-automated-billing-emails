@@ -1,0 +1,16 @@
+<transactionbodycustomfield scriptid="custbody_ar_hold">
+  <accesslevel>2</accesslevel>
+  <bodysale>T</bodysale>
+  <checkspelling>F</checkspelling>
+  <defaultchecked>F</defaultchecked>
+  <description>When checked, the AR Invoice Sender never emails this invoice (disputed, on payment plan, etc.).</description>
+  <displaytype>NORMAL</displaytype>
+  <fieldtype>CHECKBOX</fieldtype>
+  <help>Check to exclude this invoice from automated invoice emails. Uncheck to resume the normal cadence.</help>
+  <isformula>F</isformula>
+  <ismandatory>F</ismandatory>
+  <label>Hold AR Emails</label>
+  <searchlevel>2</searchlevel>
+  <showinlist>F</showinlist>
+  <storevalue>T</storevalue>
+</transactionbodycustomfield>

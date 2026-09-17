@@ -1,0 +1,16 @@
+<entitycustomfield scriptid="custentity_ar_send_invoices">
+  <accesslevel>2</accesslevel>
+  <appliestocustomer>T</appliestocustomer>
+  <checkspelling>F</checkspelling>
+  <defaultchecked>T</defaultchecked>
+  <description>Opt-in for the AR Invoice Sender. When checked, this customer's open invoices are emailed as PDFs to the Email Address for Notification (custentity_2663_email_address_notif), or to the customer's Email when that field is empty.</description>
+  <displaytype>NORMAL</displaytype>
+  <fieldtype>CHECKBOX</fieldtype>
+  <help>Checked by default on new customers. Check to have open invoices emailed automatically. Recipients come from Email Address for Notification (comma- or semicolon-separated list allowed); when that field is empty the customer's Email field is used. Leave unchecked to exclude this customer entirely.</help>
+  <isformula>F</isformula>
+  <ismandatory>F</ismandatory>
+  <label>Auto-Send Open Invoices</label>
+  <searchlevel>2</searchlevel>
+  <showinlist>F</showinlist>
+  <storevalue>T</storevalue>
+</entitycustomfield>
