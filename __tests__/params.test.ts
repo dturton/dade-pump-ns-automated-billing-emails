@@ -102,12 +102,18 @@ describe('getParams (N/runtime stub)', () => {
     expect('invoiceIds' in getParams()).toBe(false);
   });
 
-  it('reads the manual-send invoice ids and checkbox overrides passed as T/F', () => {
-    stubParameters({ [PARAM.defaultSender]: '99', [PARAM.templateId]: 123, [PARAM.invoiceIds]: '101,102,101', [PARAM.dryRun]: 'T', [PARAM.sendDaily]: 'F' });
+  it('reads checkbox parameters passed as T/F', () => {
+    stubParameters({ [PARAM.defaultSender]: '99', [PARAM.templateId]: 123, [PARAM.dryRun]: 'T', [PARAM.sendDaily]: 'F' });
     const params = getParams();
-    expect(params.invoiceIds).toEqual([101, 102]);
     expect(params.dryRun).toBe(true);
     expect(params.sendDaily).toBe(false);
+  });
+
+  it('reads the manual-send invoice ids and ignores Dry Run on a manual send', () => {
+    stubParameters({ [PARAM.defaultSender]: '99', [PARAM.templateId]: 123, [PARAM.invoiceIds]: '101,102,101', [PARAM.dryRun]: true });
+    const params = getParams();
+    expect(params.invoiceIds).toEqual([101, 102]);
+    expect(params.dryRun).toBe(false);
   });
 
   it('rejects a malformed invoice-ids parameter', () => {

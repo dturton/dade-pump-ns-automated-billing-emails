@@ -32,7 +32,7 @@ export interface Params {
   customerId?: number;
   /**
    * When set (manual send from the preview page), exactly these invoices are emailed:
-   * the cadence and the "sent today" exclusion are bypassed; on hold and opt-out still apply.
+   * the cadence, the "sent today" exclusion and Dry Run are bypassed; on hold and opt-out still apply.
    */
   invoiceIds?: number[];
 }
@@ -110,16 +110,20 @@ export function getParams(): Params {
   const templateId = Number(get(PARAM.templateId));
   if (!templateId) throw new Error(`Script parameter ${PARAM.templateId} (email template internal id) is required`);
 
+  const invoiceIds = parseInvoiceIds(get(PARAM.invoiceIds));
+  const manual = invoiceIds.length > 0;
   const params: Params = {
     senderMap: parseSenderMap(get(PARAM.senderMap)),
     defaultSender,
     templateId,
     digestRecipient: String(get(PARAM.digestRecipient) ?? '').trim(),
-    dryRun: isChecked(get(PARAM.dryRun)),
+    // A manual send (Invoice IDs set) is always real: the user confirmed it on the preview page, and a
+    // false Dry Run override passed through N/task is dropped, which would leave the deployment's
+    // default-checked Dry Run in force.
+    dryRun: manual ? false : isChecked(get(PARAM.dryRun)),
     sendDaily: isChecked(get(PARAM.sendDaily)),
     customerId: Number(get(PARAM.customer)) || undefined,
-    invoiceIds: parseInvoiceIds(get(PARAM.invoiceIds)),
   };
-  if (!params.invoiceIds?.length) delete params.invoiceIds;
+  if (manual) params.invoiceIds = invoiceIds;
   return params;
 }

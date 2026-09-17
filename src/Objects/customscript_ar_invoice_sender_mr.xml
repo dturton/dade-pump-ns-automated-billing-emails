@@ -107,7 +107,7 @@
       <description>Manual send: comma-separated invoice internal ids to email now. Set per run by the preview Suitelet (Send Selected); leave empty on every deployment.</description>
       <displaytype>NORMAL</displaytype>
       <fieldtype>CLOBTEXT</fieldtype>
-      <help>When set, exactly these invoices are emailed: the cadence and the "already sent today" exclusion are bypassed (on hold and opt-out still apply) and the invoices are stamped as sent. The preview page fills this in when it queues a manual send. Never set it on the scheduled deployment.</help>
+      <help>When set, exactly these invoices are emailed for real: the cadence, the "already sent today" exclusion and Dry Run are bypassed (on hold and opt-out still apply) and the invoices are stamped as sent. The preview page fills this in when it queues a manual send. Never set it on the scheduled deployment.</help>
       <isformula>F</isformula>
       <ismandatory>F</ismandatory>
       <label>Invoice IDs (manual send)</label>

@@ -100,8 +100,8 @@ account's time zone (the deployment XML uses `07:00:00Z`; if it shows up UTC-shi
 Then open the third deployment, **AR Invoice Sender - selected invoices (queued by the Preview page)**
 (`customdeploy_ar_invoice_sender_selected`), and fill in the same Default Sender Employee, Sender Map, Email Template
 Internal ID and Digest Recipient. Its parameters are independent of the daily deployment. Leave Customer, Send Daily
-and Invoice IDs empty on it; its Dry Run value is ignored because the preview page overrides it on every send. Until
-this deployment is configured, **Send Selected** on the preview page queues a run that fails on start-up.
+and Invoice IDs empty on it. Its Dry Run value is ignored: a manual send from the preview page always emails for
+real. Until this deployment is configured, **Send Selected** on the preview page queues a run that fails on start-up.
 
 ## Enabling a customer
 
@@ -198,12 +198,11 @@ invoices already emailed today so they can be re-sent by hand; invoices on hold 
 
 ### Sending selected invoices by hand
 
-Tick the invoices to send (the header checkbox selects or clears every selectable row), decide whether **Dry Run
-(log only, send nothing)** in the *Manual send* group should stay checked, and click **Send Selected**. After a
-confirmation dialog the page re-validates the selection against the live query and queues the AR Invoice Sender
-Map/Reduce on the `customdeploy_ar_invoice_sender_selected` deployment with the Invoice IDs parameter set to the
-selection and Dry Run set from the page. The Suitelet itself never renders PDFs or calls `email.send`: the Map/Reduce
-does the work with its usual batching, governance handling, stamping and digest.
+Tick the invoices to send (the header checkbox selects or clears every selectable row) and click **Send Selected**.
+After a confirmation dialog the page re-validates the selection against the live query and queues the AR Invoice
+Sender Map/Reduce on the `customdeploy_ar_invoice_sender_selected` deployment with the Invoice IDs parameter set to
+the selection. The Suitelet itself never renders PDFs or calls `email.send`: the Map/Reduce does the work with its
+usual batching, governance handling, stamping and digest.
 
 What a manual send does differently from the scheduled run:
 
@@ -215,15 +214,17 @@ What a manual send does differently from the scheduled run:
 * **Invoices are stamped as usual** (`custbody_ar_last_sent`, `custbody_ar_send_count`), so the cadence keeps working
   afterwards: the "reached and not yet covered" rule sends the next touch point when it is reached, exactly as if the
   scheduled run had made the send.
-* **Dry Run comes from the page**, not from the deployment: it is checked on every fresh page load. A dry run logs each
-  email it would send, stamps nothing, and emails the digest with the `[DRY RUN]` prefix.
+* **Dry Run does not apply.** A manual send always emails for real, whatever the Dry Run parameter on the deployment
+  says: the confirmation dialog is the safeguard. (A false Dry Run override passed through `N/task` is dropped by
+  NetSuite, which would otherwise leave the deployment's default-checked Dry Run in force, so the script ignores the
+  parameter whenever Invoice IDs is set.) To rehearse, use the per-customer manual deployment with Dry Run checked.
 * The **digest subject** reads "AR Invoice Sender (manual send)". Invoices a manual run cannot render within the
   governance limit are reported as "Not sent" rather than deferred, since no later run will pick them up; select them
   again.
 
 The confirmation page lists what was queued and skipped, the task id, and links to the Map/Reduce Script Status page.
-Each queued send is written to the Suitelet's execution log (AUDIT level) with the user, the invoice numbers and the
-Dry Run flag. Only one manual send can run at a time on the deployment; if one is still in progress the page reports
+Each queued send is written to the Suitelet's execution log (AUDIT level) with the user and the invoice numbers.
+Only one manual send can run at a time on the deployment; if one is still in progress the page reports
 that the Map/Reduce could not be queued and asks you to retry.
 
 ## Digest
