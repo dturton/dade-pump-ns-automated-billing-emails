@@ -122,15 +122,10 @@
       <isdeployed>T</isdeployed>
       <loglevel>AUDIT</loglevel>
       <queueallstagesatonce>T</queueallstagesatonce>
-      <recurrence>
-        <daily>
-          <startdate>2026-09-10</startdate>
-          <starttime>07:00:00Z</starttime>
-          <everyxdays>1</everyxdays>
-        </daily>
-      </recurrence>
-      <status>SCHEDULED</status>
-      <title>AR Invoice Sender - daily 7:00 AM</title>
+      <!-- Deployed Not Scheduled for now. To go live, set the status to Scheduled with a daily
+           recurrence (7:00 AM) on the deployment in the UI, or restore the <recurrence> block here. -->
+      <status>NOTSCHEDULED</status>
+      <title>AR Invoice Sender - daily (not scheduled yet)</title>
       <yieldaftermins>60</yieldaftermins>
     </scriptdeployment>
     <scriptdeployment scriptid="customdeploy_ar_invoice_sender_manual">

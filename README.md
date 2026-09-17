@@ -1,8 +1,9 @@
 # AR Invoice Sender (NetSuite SDF project)
 
-Daily Map/Reduce script that emails each opted-in customer their open invoices as PDF attachments,
+Map/Reduce script that emails each opted-in customer their open invoices as PDF attachments,
 following a cadence (day 0, then 1 / 7 / 14 / 30 days overdue) or daily, and sends an internal digest.
 A preview page shows what the next run will do and lets a user pick invoices to email right away.
+The scheduled run is currently deployed **Not Scheduled**; see "First-run configuration" to turn it on.
 
 * SuiteScript 2.1, written in TypeScript (`src/TypeScript`) and compiled to AMD into
   `src/FileCabinet/SuiteScripts/ar-invoice-sender/`.
@@ -78,7 +79,7 @@ the target account before deploying.
 
 ### First-run configuration
 
-After the deploy, open the deployment (Customization > Scripting > Script Deployments > "AR Invoice Sender - daily 7:00 AM")
+After the deploy, open the deployment (Customization > Scripting > Script Deployments > "AR Invoice Sender - daily (not scheduled yet)")
 and fill in the parameters:
 
 | Parameter | Id | Notes |
@@ -92,10 +93,11 @@ and fill in the parameters:
 | Customer (only this customer) | `custscript_ar_customer` | Optional. Restricts the run to one customer. For the manual deployment; leave empty on the daily one. |
 | Invoice IDs (manual send) | `custscript_ar_invoice_ids` | **Leave empty on every deployment.** The preview page sets it per run when it queues a manual send (see below). |
 
-The deployment is created **Scheduled, daily at 7:00 AM**, and the Dry Run parameter defaults to checked. Before the
-first scheduled run, confirm on the deployment that Dry Run is checked and that the schedule shows 7:00 AM in your
-account's time zone (the deployment XML uses `07:00:00Z`; if it shows up UTC-shifted, adjust `starttime` in
-`customscript_ar_invoice_sender_mr.xml` or fix the time in the UI). Uncheck Dry Run to go live.
+The deployment is created **Not Scheduled** for now, so nothing runs automatically after a deploy; sending is manual
+from the preview page until the schedule is turned on. The Dry Run parameter defaults to checked. To enable the
+automatic run, open the deployment, set Status to Scheduled with a Daily recurrence at 7:00 AM in your account's time
+zone, and save (or restore the `<recurrence>` block in `customscript_ar_invoice_sender_mr.xml` and redeploy). Before
+the first scheduled run, confirm that Dry Run is checked; uncheck it to go live.
 
 Then open the third deployment, **AR Invoice Sender - selected invoices (queued by the Preview page)**
 (`customdeploy_ar_invoice_sender_selected`), and fill in the same Default Sender Employee, Sender Map, Email Template
@@ -269,7 +271,7 @@ drives the script-parameter tests. The cadence, email parsing and batching modul
   remaining usage are deferred to the next run and listed in the digest. The deployment runs with buffer size 1 and
   concurrency 1.
 * **Size:** attachments over 14.5 MB per email are split; a single PDF larger than that cannot be emailed and is reported.
-* **"Sent today" and day counts** are computed in SuiteQL with `SYSDATE`, i.e. the database server's date. With the
+* **"Sent today" and day counts** are computed in SuiteQL with `SYSDATE`, i.e. the database server's date. With a
   7:00 AM ET schedule this matches the calendar date in North America.
 * **Manual sends share one deployment.** `customdeploy_ar_invoice_sender_selected` runs one instance at a time; a
   second **Send Selected** while one is still running is refused by NetSuite and reported on the page. The selection is
