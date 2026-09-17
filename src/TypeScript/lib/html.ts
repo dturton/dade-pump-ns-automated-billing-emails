@@ -75,13 +75,15 @@ export function invoiceTable(rows: InvoiceRow[]): string {
   );
 }
 
-export function digestHtml(results: CustomerResult[], uncaught: string[], dryRun: boolean): { subject: string; body: string } {
+/** manual: the run was a manual send from the preview page (selected invoices, cadence bypassed). */
+export function digestHtml(results: CustomerResult[], uncaught: string[], dryRun: boolean, manual = false): { subject: string; body: string } {
   const sent = results.filter((r) => r.status === 'sent' || r.status === 'dry-run');
   const skipped = results.filter((r) => r.status === 'skipped');
   const failed = results.filter((r) => r.status === 'failed' || r.errors.length > 0);
   const nothing = results.filter((r) => r.status === 'nothing' && !r.errors.length).length;
   const emails = sent.reduce((n, r) => n + r.emails, 0);
   const prefix = dryRun ? '[DRY RUN] ' : '';
+  const title = manual ? 'AR Invoice Sender (manual send)' : 'AR Invoice Sender';
 
   const section = (title: string, rows: string[]) =>
     `<h3 style="margin:18px 0 6px;">${title} (${rows.length})</h3>` + (rows.length ? `<ul style="margin:0;">${rows.join('')}</ul>` : '<p style="margin:0;color:#777;">None</p>');
@@ -90,7 +92,7 @@ export function digestHtml(results: CustomerResult[], uncaught: string[], dryRun
 
   const body =
     `<div style="font-family:Arial,sans-serif;font-size:13px;">` +
-    `<p>${prefix}AR Invoice Sender run summary: ${sent.length} customer(s) ${dryRun ? 'would be ' : ''}emailed (${emails} email(s)), ` +
+    `<p>${prefix}${title} run summary: ${sent.length} customer(s) ${dryRun ? 'would be ' : ''}emailed (${emails} email(s)), ` +
     `${skipped.length} skipped for missing email address, ${failed.length + uncaught.length} with errors, ${nothing} with nothing due.</p>` +
     section(dryRun ? 'Would send' : 'Sent', sent.map((r) => li(`${name(r)} &rarr; ${escapeHtml(r.recipients.join(', '))}${r.recipientSource === 'email' ? ' (customer email field)' : ''}: ${escapeHtml(r.invoices.join(', '))}${r.emails > 1 ? ` in ${r.emails} emails` : ''}`))) +
     section('Skipped: no valid email address (notification field and customer email both empty or invalid)', skipped.map((r) => li(name(r)))) +
@@ -98,7 +100,7 @@ export function digestHtml(results: CustomerResult[], uncaught: string[], dryRun
     `</div>`;
 
   return {
-    subject: `${prefix}AR Invoice Sender: ${sent.length} sent, ${skipped.length} skipped, ${failed.length + uncaught.length} errors`,
+    subject: `${prefix}${title}: ${sent.length} sent, ${skipped.length} skipped, ${failed.length + uncaught.length} errors`,
     body,
   };
 }

@@ -7,6 +7,9 @@
  * getInputData: SuiteQL for open invoices (lib/openInvoices), grouped by customer.
  * reduce (per customer): cadence filter -> render PDFs -> one email (split only if > 15 MB) -> stamp invoices.
  * summarize: internal digest email.
+ *
+ * Manual send: when the Invoice IDs parameter is set (the preview Suitelet submits it through N/task),
+ * exactly those invoices are emailed, bypassing the cadence and the "sent today" exclusion.
  */
 
 import { EntryPoints } from 'N/types';
@@ -41,8 +44,10 @@ export const getInputData: EntryPoints.MapReduce.getInputData = () => {
   const params = getParams(); // fail fast on bad configuration before touching any data
   const byCustomer: Record<string, OpenInvoice[]> = {};
   let rows = 0;
-  if (params.customerId) log.audit('getInputData', `Customer parameter set: only customer ${params.customerId} is processed`);
-  forEachOpenInvoice({ customerId: params.customerId }, (row) => {
+  const manual = !!params.invoiceIds;
+  if (manual) log.audit('getInputData', `Manual send: ${params.invoiceIds!.length} selected invoice(s), cadence bypassed`);
+  else if (params.customerId) log.audit('getInputData', `Customer parameter set: only customer ${params.customerId} is processed`);
+  forEachOpenInvoice({ customerId: manual ? undefined : params.customerId, invoiceIds: params.invoiceIds, includeSentToday: manual }, (row) => {
     const key = String(row.customerid);
     (byCustomer[key] || (byCustomer[key] = [])).push(row);
     rows++;
@@ -91,12 +96,15 @@ function processCustomer(params: Params, invoices: OpenInvoice[], result: Custom
   const recipients = rec.addresses.slice(0, MAX_RECIPIENTS);
   result.recipientSource = rec.source === 'primary' ? NOTIFY_EMAIL_FIELD : 'email';
 
-  const due = invoices.filter((inv) =>
-    shouldSend(
-      { daysOverdue: Number(inv.daysoverdue), lastSentDaysOverdue: inv.lastsentdaysoverdue == null ? null : Number(inv.lastsentdaysoverdue) },
-      params.sendDaily,
-    ),
-  );
+  // Manual send (Invoice IDs parameter): the query already returned exactly the selected invoices.
+  const due = params.invoiceIds
+    ? invoices
+    : invoices.filter((inv) =>
+        shouldSend(
+          { daysOverdue: Number(inv.daysoverdue), lastSentDaysOverdue: inv.lastsentdaysoverdue == null ? null : Number(inv.lastsentdaysoverdue) },
+          params.sendDaily,
+        ),
+      );
   if (!due.length) return;
 
   const rendered: Rendered[] = [];
@@ -104,7 +112,11 @@ function processCustomer(params: Params, invoices: OpenInvoice[], result: Custom
     const reserve = RENDER_UNITS + STAMP_UNITS * (rendered.length + 1) + FINISH_UNITS;
     if (runtime.getCurrentScript().getRemainingUsage() < reserve) {
       const left = due.slice(rendered.length).map((i) => i.tranid);
-      result.errors.push(`Deferred to the next run (governance): ${left.join(', ')}`);
+      result.errors.push(
+        params.invoiceIds
+          ? `Not sent (governance): ${left.join(', ')}; select them again on the preview page`
+          : `Deferred to the next run (governance): ${left.join(', ')}`,
+      );
       log.audit(`${label}: governance low, deferring ${left.length} invoice(s)`, left.join(', '));
       break;
     }
@@ -183,7 +195,7 @@ export const summarize: EntryPoints.MapReduce.summarize = (summary) => {
   });
   for (const u of uncaught) log.error('Unhandled error', u);
 
-  const digest = digestHtml(results, uncaught, params.dryRun);
+  const digest = digestHtml(results, uncaught, params.dryRun, !!params.invoiceIds);
   log.audit(digest.subject, { seconds: summary.seconds, usage: summary.usage, yields: summary.yields });
 
   if (!params.digestRecipient) {

@@ -27,15 +27,24 @@ export interface OpenInvoice extends InvoiceRow {
   /** YYYY-MM-DD, null = never sent */
   lastsent: string | null;
   sendcount: number;
+  /** 'T' when the invoice was already emailed today (only returned with includeSentToday) */
+  senttoday: string;
 }
 
 export interface OpenInvoiceFilters {
   customerId?: number;
   subsidiaryId?: number;
+  /** restrict to these invoice internal ids (manual send from the preview page) */
+  invoiceIds?: number[];
+  /** also return invoices already emailed today (default: excluded) */
+  includeSentToday?: boolean;
 }
 
+/** Oracle rejects IN lists longer than 1000 expressions; stay well under it. */
+const IN_CHUNK = 500;
+
 // All date arithmetic happens in SQL so the scripts only deal with whole-day integers and ISO strings.
-// Excludes: customer opt-in unchecked, invoice on hold, invoice already sent today.
+// Excludes: customer opt-in unchecked, invoice on hold, invoice already sent today (unless includeSentToday).
 // t.status holds the bare code in SuiteQL ('A' = Open); the 'CustInvc:A' form is for N/search and never matches here.
 const BASE_SQL = `
   SELECT
@@ -54,7 +63,8 @@ const BASE_SQL = `
     TRUNC(SYSDATE) - t.duedate             AS daysoverdue,
     t.custbody_ar_last_sent - t.duedate    AS lastsentdaysoverdue,
     TO_CHAR(t.custbody_ar_last_sent, 'YYYY-MM-DD') AS lastsent,
-    NVL(t.custbody_ar_send_count, 0)       AS sendcount
+    NVL(t.custbody_ar_send_count, 0)       AS sendcount,
+    CASE WHEN t.custbody_ar_last_sent >= TRUNC(SYSDATE) THEN 'T' ELSE 'F' END AS senttoday
   FROM transaction t
   JOIN customer c ON c.id = t.entity
   JOIN transactionline tl ON tl.transaction = t.id AND tl.mainline = 'T'
@@ -63,11 +73,13 @@ const BASE_SQL = `
     AND t.status = 'A'
     AND c.custentity_ar_send_invoices = 'T'
     AND NVL(t.custbody_ar_hold, 'F') = 'F'
-    AND (t.custbody_ar_last_sent IS NULL OR t.custbody_ar_last_sent < TRUNC(SYSDATE))
     AND NVL(t.foreignamountunpaid, 0) > 0
+    /*SENT_TODAY*/
     /*FILTERS*/
   ORDER BY t.entity, t.duedate, t.tranid
 `;
+
+const SENT_TODAY_SQL = 'AND (t.custbody_ar_last_sent IS NULL OR t.custbody_ar_last_sent < TRUNC(SYSDATE))';
 
 /** The open-invoice SuiteQL plus bind parameters for the optional filters. */
 export function openInvoicesSql(filters: OpenInvoiceFilters = {}): { query: string; params: number[] } {
@@ -81,7 +93,18 @@ export function openInvoicesSql(filters: OpenInvoiceFilters = {}): { query: stri
     clauses.push('AND tl.subsidiary = ?');
     params.push(filters.subsidiaryId);
   }
-  return { query: BASE_SQL.replace('/*FILTERS*/', clauses.join('\n    ')), params };
+  const ids = filters.invoiceIds || [];
+  if (ids.length) {
+    const groups: string[] = [];
+    for (let i = 0; i < ids.length; i += IN_CHUNK) {
+      const chunk = ids.slice(i, i + IN_CHUNK);
+      groups.push(`t.id IN (${chunk.map(() => '?').join(', ')})`);
+      params.push(...chunk);
+    }
+    clauses.push(`AND (${groups.join(' OR ')})`);
+  }
+  const query = BASE_SQL.replace('/*SENT_TODAY*/', filters.includeSentToday ? '' : SENT_TODAY_SQL).replace('/*FILTERS*/', clauses.join('\n    '));
+  return { query, params };
 }
 
 /** Streams every matching row (1000 per page). Return false from the callback to stop early. */

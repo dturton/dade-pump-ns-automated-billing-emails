@@ -101,6 +101,19 @@
       <selectrecordtype>-2</selectrecordtype>
       <storevalue>T</storevalue>
     </scriptcustomfield>
+    <scriptcustomfield scriptid="custscript_ar_invoice_ids">
+      <accesslevel>2</accesslevel>
+      <checkspelling>F</checkspelling>
+      <description>Manual send: comma-separated invoice internal ids to email now. Set per run by the preview Suitelet (Send Selected); leave empty on every deployment.</description>
+      <displaytype>NORMAL</displaytype>
+      <fieldtype>CLOBTEXT</fieldtype>
+      <help>When set, exactly these invoices are emailed: the cadence and the "already sent today" exclusion are bypassed (on hold and opt-out still apply) and the invoices are stamped as sent. The preview page fills this in when it queues a manual send. Never set it on the scheduled deployment.</help>
+      <isformula>F</isformula>
+      <ismandatory>F</ismandatory>
+      <label>Invoice IDs (manual send)</label>
+      <searchlevel>2</searchlevel>
+      <storevalue>T</storevalue>
+    </scriptcustomfield>
   </scriptcustomfields>
   <scriptdeployments>
     <scriptdeployment scriptid="customdeploy_ar_invoice_sender_mr">
@@ -128,6 +141,16 @@
       <queueallstagesatonce>T</queueallstagesatonce>
       <status>NOTSCHEDULED</status>
       <title>AR Invoice Sender - manual run (set Customer)</title>
+      <yieldaftermins>60</yieldaftermins>
+    </scriptdeployment>
+    <scriptdeployment scriptid="customdeploy_ar_invoice_sender_selected">
+      <buffersize>1</buffersize>
+      <concurrencylimit>1</concurrencylimit>
+      <isdeployed>T</isdeployed>
+      <loglevel>AUDIT</loglevel>
+      <queueallstagesatonce>T</queueallstagesatonce>
+      <status>NOTSCHEDULED</status>
+      <title>AR Invoice Sender - selected invoices (queued by the Preview page)</title>
       <yieldaftermins>60</yieldaftermins>
     </scriptdeployment>
   </scriptdeployments>
