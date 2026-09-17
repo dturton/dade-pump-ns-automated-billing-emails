@@ -2,6 +2,7 @@
 
 Daily Map/Reduce script that emails each opted-in customer their open invoices as PDF attachments,
 following a cadence (day 0, then 1 / 7 / 14 / 30 days overdue) or daily, and sends an internal digest.
+A preview page shows what the next run will do and lets a user pick invoices to email right away.
 
 * SuiteScript 2.1, written in TypeScript (`src/TypeScript`) and compiled to AMD into
   `src/FileCabinet/SuiteScripts/ar-invoice-sender/`.
@@ -14,7 +15,7 @@ following a cadence (day 0, then 1 / 7 / 14 / 30 days overdue) or daily, and sen
 | Path | Purpose |
 | --- | --- |
 | `src/TypeScript/ar_invoice_sender_mr.ts` | Map/Reduce entry points: `getInputData`, `reduce`, `summarize` |
-| `src/TypeScript/ar_invoice_preview_sl.ts` | Suitelet: read-only preview of the query results and today's verdicts |
+| `src/TypeScript/ar_invoice_preview_sl.ts` | Suitelet: preview of the query results and today's verdicts; **Send Selected** queues a manual send |
 | `src/TypeScript/ar_optin_customers_mu.ts` | Mass update script: checks the opt-in on matching customers |
 | `src/TypeScript/lib/openInvoices.ts` | The open-invoice SuiteQL (shared by both scripts) |
 | `src/TypeScript/lib/cadence.ts` | Cadence decision (`shouldSend` / `explainSend`) |
@@ -25,7 +26,7 @@ following a cadence (day 0, then 1 / 7 / 14 / 30 days overdue) or daily, and sen
 | `src/Objects/custentity_ar_send_invoices.xml` | Customer opt-in checkbox |
 | `src/Objects/custbody_ar_last_sent.xml`, `custbody_ar_send_count.xml`, `custbody_ar_hold.xml` | Invoice tracking fields |
 | `src/Objects/custemailtmpl_ar_invoice_reminder.xml` (+ `.template.html`) | Customer-facing email template |
-| `src/Objects/customscript_ar_invoice_sender_mr.xml` | Script record, parameters and daily deployment |
+| `src/Objects/customscript_ar_invoice_sender_mr.xml` | Script record, parameters and the daily, manual (per customer) and selected-invoices deployments |
 | `src/Objects/customscript_ar_invoice_preview_sl.xml` | Preview Suitelet script record and deployment |
 | `src/Objects/customscript_ar_optin_mu.xml` | One-time custom mass update that opts in existing customers |
 | `src/manifest.xml` | Declares the existing `custentity_2663_email_address_notif` field as a dependency |
@@ -89,11 +90,18 @@ and fill in the parameters:
 | Dry Run | `custscript_ar_dry_run` | **Checked by default on deploy.** See below. |
 | Send Daily | `custscript_ar_send_daily` | Ignore the cadence and send every open invoice every run. |
 | Customer (only this customer) | `custscript_ar_customer` | Optional. Restricts the run to one customer. For the manual deployment; leave empty on the daily one. |
+| Invoice IDs (manual send) | `custscript_ar_invoice_ids` | **Leave empty on every deployment.** The preview page sets it per run when it queues a manual send (see below). |
 
 The deployment is created **Scheduled, daily at 7:00 AM**, and the Dry Run parameter defaults to checked. Before the
 first scheduled run, confirm on the deployment that Dry Run is checked and that the schedule shows 7:00 AM in your
 account's time zone (the deployment XML uses `07:00:00Z`; if it shows up UTC-shifted, adjust `starttime` in
 `customscript_ar_invoice_sender_mr.xml` or fix the time in the UI). Uncheck Dry Run to go live.
+
+Then open the third deployment, **AR Invoice Sender - selected invoices (queued by the Preview page)**
+(`customdeploy_ar_invoice_sender_selected`), and fill in the same Default Sender Employee, Sender Map, Email Template
+Internal ID and Digest Recipient. Its parameters are independent of the daily deployment. Leave Customer, Send Daily
+and Invoice IDs empty on it; its Dry Run value is ignored because the preview page overrides it on every send. Until
+this deployment is configured, **Send Selected** on the preview page queues a run that fails on start-up.
 
 ## Enabling a customer
 
@@ -174,17 +182,49 @@ Never set the Customer parameter on the daily deployment: the scheduled run woul
 ## Preview page
 
 The Suitelet **AR Invoice Sender Preview** (`customscript_ar_invoice_preview_sl`) shows every invoice the query returns,
-with today's cadence verdict, without sending or changing anything. Open it from Customization > Scripting > Script
-Deployments > "AR Invoice Sender Preview" (the deployment's URL), or bookmark that URL. It is available to the
-Administrator, Accountant and A/R Clerk roles; edit `audslctrole` in the deployment XML to change that.
+with today's cadence verdict. Refreshing the page sends nothing and changes nothing. Open it from Customization >
+Scripting > Script Deployments > "AR Invoice Sender Preview" (the deployment's URL), or bookmark that URL. It is
+available to the Administrator, Accountant and A/R Clerk roles; edit `audslctrole` in the deployment XML to change
+that. Because the page can also queue real emails (below), keep that role list to people who may send invoices.
 
 Filters: customer, subsidiary, "Evaluate as Send Daily" (see the verdicts the Send Daily parameter would give) and
-"Only invoices sending today". Columns: customer and invoice (linked), recipients as parsed and validated (marked when the Email field fallback
-applies), subsidiary,
-dates, days overdue, amount unpaid, last sent, send count, and **Sends Today?** with the reason (never sent, N days
-overdue, not overdue yet, touch already sent, customer skipped for no valid email address). Rows are green when they
-send today and red when the customer has no valid email address. Totals are per currency. The page shows at most
-2,000 rows; narrow the filters beyond that.
+"Only invoices sending today". Columns: a selection checkbox, customer and invoice (linked), recipients as parsed and
+validated (marked when the Email field fallback applies), subsidiary, dates, days overdue, amount unpaid, last sent,
+send count, and **Sends Today?** with the reason (never sent, N days overdue, not overdue yet, touch already sent,
+already sent today, customer skipped for no valid email address). Rows are green when they send today, grey when
+they were already emailed today, and red when the customer has no valid email address. Totals are per currency. The
+page shows at most 2,000 rows; narrow the filters beyond that. Unlike the scheduled run, the preview also lists
+invoices already emailed today so they can be re-sent by hand; invoices on hold are never listed.
+
+### Sending selected invoices by hand
+
+Tick the invoices to send (the header checkbox selects or clears every selectable row), decide whether **Dry Run
+(log only, send nothing)** in the *Manual send* group should stay checked, and click **Send Selected**. After a
+confirmation dialog the page re-validates the selection against the live query and queues the AR Invoice Sender
+Map/Reduce on the `customdeploy_ar_invoice_sender_selected` deployment with the Invoice IDs parameter set to the
+selection and Dry Run set from the page. The Suitelet itself never renders PDFs or calls `email.send`: the Map/Reduce
+does the work with its usual batching, governance handling, stamping and digest.
+
+What a manual send does differently from the scheduled run:
+
+* **The cadence is bypassed.** Every selected invoice is emailed, whatever its days overdue or last touch.
+* **"Already sent today" is bypassed.** A selected invoice that went out this morning is sent again.
+* **Everything else applies.** Invoices on hold and customers who opted out are not listed and cannot be selected; rows
+  whose customer has no valid email address have no checkbox. The selection is checked again when you click the button,
+  so an invoice paid, closed or put on hold since the page was loaded is reported as skipped and not sent.
+* **Invoices are stamped as usual** (`custbody_ar_last_sent`, `custbody_ar_send_count`), so the cadence keeps working
+  afterwards: the "reached and not yet covered" rule sends the next touch point when it is reached, exactly as if the
+  scheduled run had made the send.
+* **Dry Run comes from the page**, not from the deployment: it is checked on every fresh page load. A dry run logs each
+  email it would send, stamps nothing, and emails the digest with the `[DRY RUN]` prefix.
+* The **digest subject** reads "AR Invoice Sender (manual send)". Invoices a manual run cannot render within the
+  governance limit are reported as "Not sent" rather than deferred, since no later run will pick them up; select them
+  again.
+
+The confirmation page lists what was queued and skipped, the task id, and links to the Map/Reduce Script Status page.
+Each queued send is written to the Suitelet's execution log (AUDIT level) with the user, the invoice numbers and the
+Dry Run flag. Only one manual send can run at a time on the deployment; if one is still in progress the page reports
+that the Map/Reduce could not be queued and asks you to retry.
 
 ## Digest
 
@@ -192,7 +232,8 @@ At the end of each run `summarize` emails the Digest Recipient (from the Default
 sent (recipients and invoice numbers, flagged when the fallback Email field was used), the customers skipped for a
 missing email address, and every error (per-customer
 failures, invoices deferred for governance, oversized PDFs, field-stamp failures, unhandled reduce errors). The same
-summary is written to the execution log.
+summary is written to the execution log. Manual sends from the preview page produce the same digest, with
+"(manual send)" in the subject.
 
 ## Development
 
@@ -229,6 +270,12 @@ drives the script-parameter tests. The cadence, email parsing and batching modul
 * **Size:** attachments over 14.5 MB per email are split; a single PDF larger than that cannot be emailed and is reported.
 * **"Sent today" and day counts** are computed in SuiteQL with `SYSDATE`, i.e. the database server's date. With the
   7:00 AM ET schedule this matches the calendar date in North America.
+* **Manual sends share one deployment.** `customdeploy_ar_invoice_sender_selected` runs one instance at a time; a
+  second **Send Selected** while one is still running is refused by NetSuite and reported on the page. The selection is
+  passed as a script parameter override, so nothing is stored on the deployment between runs.
+* **The Send Selected button is inline JavaScript** on the Suitelet form (no separate client script). It reads the
+  ticked checkboxes, fills two hidden fields and submits the form; if NetSuite ever changes how form buttons are
+  rendered, that is the place to look.
 * **getInputData holds all open invoices in memory** (grouped by customer, no map stage). That is fine for tens of
   thousands of invoices; beyond that switch to a `{ type: 'suiteql' }` input with a map stage.
 * `render.transactionFile` does not exist in `N/render`; the PDF is produced by `render.transaction({ entityId, printMode: PDF })`.

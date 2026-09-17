@@ -13,7 +13,12 @@ export const PARAM = {
   dryRun: 'custscript_ar_dry_run',
   sendDaily: 'custscript_ar_send_daily',
   customer: 'custscript_ar_customer',
+  invoiceIds: 'custscript_ar_invoice_ids',
 } as const;
+
+/** Map/Reduce script id and the deployment the preview page submits manual sends to. */
+export const SENDER_SCRIPT_ID = 'customscript_ar_invoice_sender_mr';
+export const SELECTED_DEPLOYMENT_ID = 'customdeploy_ar_invoice_sender_selected';
 
 export interface Params {
   /** subsidiary internal id -> sender employee internal id */
@@ -25,6 +30,11 @@ export interface Params {
   sendDaily: boolean;
   /** when set, only this customer's invoices are processed (manual/test deployment) */
   customerId?: number;
+  /**
+   * When set (manual send from the preview page), exactly these invoices are emailed:
+   * the cadence and the "sent today" exclusion are bypassed; on hold and opt-out still apply.
+   */
+  invoiceIds?: number[];
 }
 
 /** Parses the sender-map parameter: a JSON object {"<subsidiaryId>": <employeeId>}. Invalid JSON throws. */
@@ -49,6 +59,42 @@ export function parseSenderMap(raw: unknown): Record<string, number> {
   return map;
 }
 
+/**
+ * Parses the invoice-ids parameter: a JSON array or a comma/semicolon/whitespace-separated list of
+ * invoice internal ids. Returns unique positive integers in input order; any other token throws.
+ */
+export function parseInvoiceIds(raw: unknown): number[] {
+  const text = String(raw ?? '').trim();
+  if (!text) return [];
+  let tokens: unknown[];
+  if (text.startsWith('[')) {
+    try {
+      tokens = JSON.parse(text) as unknown[];
+    } catch (e) {
+      throw new Error(`${PARAM.invoiceIds} is not valid JSON: ${(e as Error).message}`);
+    }
+    if (!Array.isArray(tokens)) throw new Error(`${PARAM.invoiceIds} must be a JSON array or a comma-separated list of invoice internal ids`);
+  } else {
+    tokens = text.split(/[\s,;]+/).filter(Boolean);
+  }
+  const ids: number[] = [];
+  const seen = new Set<number>();
+  for (const t of tokens) {
+    const id = Number(t);
+    if (!Number.isInteger(id) || id <= 0) throw new Error(`${PARAM.invoiceIds}: "${String(t)}" is not an invoice internal id`);
+    if (!seen.has(id)) {
+      seen.add(id);
+      ids.push(id);
+    }
+  }
+  return ids;
+}
+
+/** Checkbox parameters read back as booleans; overrides passed through N/task may arrive as 'T'/'F'. */
+export function isChecked(value: unknown): boolean {
+  return value === true || value === 'T' || value === 'true';
+}
+
 export function senderFor(params: Pick<Params, 'senderMap' | 'defaultSender'>, subsidiaryId: number | string | null | undefined): number {
   const mapped = subsidiaryId == null ? undefined : params.senderMap[String(subsidiaryId)];
   return mapped || params.defaultSender;
@@ -64,13 +110,16 @@ export function getParams(): Params {
   const templateId = Number(get(PARAM.templateId));
   if (!templateId) throw new Error(`Script parameter ${PARAM.templateId} (email template internal id) is required`);
 
-  return {
+  const params: Params = {
     senderMap: parseSenderMap(get(PARAM.senderMap)),
     defaultSender,
     templateId,
     digestRecipient: String(get(PARAM.digestRecipient) ?? '').trim(),
-    dryRun: get(PARAM.dryRun) === true,
-    sendDaily: get(PARAM.sendDaily) === true,
+    dryRun: isChecked(get(PARAM.dryRun)),
+    sendDaily: isChecked(get(PARAM.sendDaily)),
     customerId: Number(get(PARAM.customer)) || undefined,
+    invoiceIds: parseInvoiceIds(get(PARAM.invoiceIds)),
   };
+  if (!params.invoiceIds?.length) delete params.invoiceIds;
+  return params;
 }

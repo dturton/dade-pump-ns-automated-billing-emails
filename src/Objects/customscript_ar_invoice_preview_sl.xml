@@ -1,5 +1,5 @@
 <suitelet scriptid="customscript_ar_invoice_preview_sl">
-  <description>Read-only preview of every invoice the AR Invoice Sender query returns, with today's cadence verdict per invoice. Sends nothing and changes nothing.</description>
+  <description>Preview of every invoice the AR Invoice Sender query returns, with today's cadence verdict per invoice. "Send Selected" queues the AR Invoice Sender Map/Reduce (deployment customdeploy_ar_invoice_sender_selected) for the ticked invoices, honouring the page's Dry Run checkbox; the page itself sends nothing.</description>
   <isinactive>F</isinactive>
   <name>AR Invoice Sender Preview</name>
   <notifyadmins>F</notifyadmins>
@@ -13,7 +13,7 @@
       <audslctrole>ADMINISTRATOR|ACCOUNTANT|AR_CLERK</audslctrole>
       <isdeployed>T</isdeployed>
       <isonline>F</isonline>
-      <loglevel>ERROR</loglevel>
+      <loglevel>AUDIT</loglevel>
       <status>RELEASED</status>
       <title>AR Invoice Sender Preview</title>
     </scriptdeployment>

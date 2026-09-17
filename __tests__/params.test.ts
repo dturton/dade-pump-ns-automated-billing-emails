@@ -1,5 +1,5 @@
 import * as runtime from 'N/runtime';
-import { getParams, PARAM, parseSenderMap, senderFor } from '../src/TypeScript/lib/params';
+import { getParams, isChecked, PARAM, parseInvoiceIds, parseSenderMap, senderFor } from '../src/TypeScript/lib/params';
 
 jest.mock('N/runtime');
 
@@ -22,6 +22,43 @@ describe('parseSenderMap', () => {
   it('rejects invalid JSON and non-objects with a message naming the parameter', () => {
     expect(() => parseSenderMap('{1: 2}')).toThrow(PARAM.senderMap);
     expect(() => parseSenderMap('[1, 2]')).toThrow(PARAM.senderMap);
+  });
+});
+
+describe('parseInvoiceIds', () => {
+  it('returns an empty list for blank input', () => {
+    expect(parseInvoiceIds('')).toEqual([]);
+    expect(parseInvoiceIds(null)).toEqual([]);
+    expect(parseInvoiceIds(undefined)).toEqual([]);
+  });
+
+  it('accepts comma, semicolon or whitespace separated ids and de-duplicates in order', () => {
+    expect(parseInvoiceIds('12, 7;7\n 12 30')).toEqual([12, 7, 30]);
+    expect(parseInvoiceIds(' 5 ')).toEqual([5]);
+  });
+
+  it('accepts a JSON array of numbers or numeric strings', () => {
+    expect(parseInvoiceIds('[3, "4", 3]')).toEqual([3, 4]);
+  });
+
+  it('rejects anything that is not a positive integer id, naming the parameter', () => {
+    expect(() => parseInvoiceIds('1,abc')).toThrow(PARAM.invoiceIds);
+    expect(() => parseInvoiceIds('0')).toThrow(PARAM.invoiceIds);
+    expect(() => parseInvoiceIds('1.5')).toThrow(PARAM.invoiceIds);
+    expect(() => parseInvoiceIds('[1,')).toThrow(PARAM.invoiceIds);
+    expect(() => parseInvoiceIds('[{"a":1}]')).toThrow(PARAM.invoiceIds);
+  });
+});
+
+describe('isChecked', () => {
+  it('accepts the stored boolean and the T/true forms a task override may deliver', () => {
+    expect(isChecked(true)).toBe(true);
+    expect(isChecked('T')).toBe(true);
+    expect(isChecked('true')).toBe(true);
+    expect(isChecked(false)).toBe(false);
+    expect(isChecked('F')).toBe(false);
+    expect(isChecked(undefined)).toBe(false);
+    expect(isChecked('')).toBe(false);
   });
 });
 
@@ -57,6 +94,25 @@ describe('getParams (N/runtime stub)', () => {
       sendDaily: false,
       customerId: 42,
     });
+  });
+
+  it('leaves invoiceIds undefined when the parameter is empty', () => {
+    stubParameters({ [PARAM.defaultSender]: '99', [PARAM.templateId]: 123, [PARAM.invoiceIds]: '' });
+    expect(getParams().invoiceIds).toBeUndefined();
+    expect('invoiceIds' in getParams()).toBe(false);
+  });
+
+  it('reads the manual-send invoice ids and checkbox overrides passed as T/F', () => {
+    stubParameters({ [PARAM.defaultSender]: '99', [PARAM.templateId]: 123, [PARAM.invoiceIds]: '101,102,101', [PARAM.dryRun]: 'T', [PARAM.sendDaily]: 'F' });
+    const params = getParams();
+    expect(params.invoiceIds).toEqual([101, 102]);
+    expect(params.dryRun).toBe(true);
+    expect(params.sendDaily).toBe(false);
+  });
+
+  it('rejects a malformed invoice-ids parameter', () => {
+    stubParameters({ [PARAM.defaultSender]: '99', [PARAM.templateId]: 123, [PARAM.invoiceIds]: '1,x' });
+    expect(() => getParams()).toThrow(PARAM.invoiceIds);
   });
 
   it('fails fast when the default sender or template id is missing', () => {
