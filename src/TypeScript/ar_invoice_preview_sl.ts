@@ -6,8 +6,8 @@
  * Preview: every invoice the AR Invoice Sender's query returns, with the cadence verdict for today.
  * The page itself sends nothing. "Send Selected" queues the Map/Reduce (deployment
  * customdeploy_ar_invoice_sender_selected) with the ticked invoice ids; that run bypasses the cadence
- * and the "sent today" exclusion for those invoices, honours the page's Dry Run checkbox, stamps the
- * invoices as usual and emails the digest.
+ * and the "sent today" exclusion for those invoices, always sends for real (Dry Run is ignored on a
+ * manual send), stamps the invoices as usual and emails the digest.
  */
 
 import { EntryPoints } from 'N/types';
@@ -27,7 +27,6 @@ const MAX_ROWS = 2000;
 /** Hidden fields the Send Selected button fills in before submitting the form. */
 const F_ACTION = 'custpage_action';
 const F_SEND_IDS = 'custpage_send_ids';
-const F_DRY_RUN = 'custpage_dry_run';
 const ACTION_SEND = 'send';
 /** Map/Reduce Script Status page (Customization > Scripting > Map/Reduce Script Status). */
 const MR_STATUS_PATH = '/app/common/scripting/mapreducescriptstatus.nl';
@@ -44,7 +43,6 @@ interface PageState {
   filters: OpenInvoiceFilters;
   sendDaily: boolean;
   onlySending: boolean;
-  dryRun: boolean;
 }
 
 export const onRequest: EntryPoints.Suitelet.onRequest = (ctx) => {
@@ -56,8 +54,6 @@ export const onRequest: EntryPoints.Suitelet.onRequest = (ctx) => {
     },
     sendDaily: p.custpage_daily === 'T',
     onlySending: p.custpage_only_sending === 'T',
-    // Dry Run is checked on a fresh page load; a submitted form carries an explicit T/F.
-    dryRun: p[F_DRY_RUN] === undefined ? true : p[F_DRY_RUN] === 'T',
   };
 
   if (ctx.request.method === 'POST' && p[F_ACTION] === ACTION_SEND) {
@@ -68,7 +64,7 @@ export const onRequest: EntryPoints.Suitelet.onRequest = (ctx) => {
 };
 
 function previewPage(state: PageState): serverWidget.Form {
-  const { filters, sendDaily, onlySending, dryRun } = state;
+  const { filters, sendDaily, onlySending } = state;
   const form = serverWidget.createForm({ title: 'AR Invoice Sender - Preview' });
   form.addFieldGroup({ id: 'custpage_filters', label: 'Filters' });
   const fld = (id: string, type: serverWidget.FieldType, label: string, source?: string) =>
@@ -78,14 +74,6 @@ function previewPage(state: PageState): serverWidget.Form {
   fld('custpage_daily', serverWidget.FieldType.CHECKBOX, 'Evaluate as Send Daily').defaultValue = sendDaily ? 'T' : 'F';
   fld('custpage_only_sending', serverWidget.FieldType.CHECKBOX, 'Only invoices sending today').defaultValue = onlySending ? 'T' : 'F';
 
-  form.addFieldGroup({ id: 'custpage_manual', label: 'Manual send' });
-  const dry = form.addField({ id: F_DRY_RUN, type: serverWidget.FieldType.CHECKBOX, label: 'Dry Run (log only, send nothing)', container: 'custpage_manual' });
-  dry.defaultValue = dryRun ? 'T' : 'F';
-  dry.setHelpText({
-    help:
-      'Applies to Send Selected only. Checked: the run logs what it would send and emails the digest, but nothing goes to customers and the invoices are not stamped. ' +
-      'Uncheck to email the selected invoices for real.',
-  });
   form.addField({ id: F_ACTION, type: serverWidget.FieldType.TEXT, label: 'Action' }).updateDisplayType({ displayType: serverWidget.FieldDisplayType.HIDDEN });
   form.addField({ id: F_SEND_IDS, type: serverWidget.FieldType.LONGTEXT, label: 'Selected invoice ids' }).updateDisplayType({ displayType: serverWidget.FieldDisplayType.HIDDEN });
 
@@ -142,11 +130,7 @@ function sendButtonJs(): string {
     `var picks=document.querySelectorAll('input.ar-pick:checked');var ids=[];` +
     'Array.prototype.forEach.call(picks,function(b){ids.push(b.value);});' +
     `if(!ids.length){alert('Tick at least one invoice first.');return function(){};}` +
-    `var dry=document.getElementsByName('${F_DRY_RUN}');var isDry=false;` +
-    `Array.prototype.forEach.call(dry,function(d){if(d.type==='checkbox'){isDry=d.checked;}else if(d.value==='T'){isDry=true;}});` +
-    `var msg=isDry?'DRY RUN: queue '+ids.length+' invoice(s)? Nothing is emailed to customers; check the digest and the execution log.'` +
-    `:'Email '+ids.length+' invoice(s) to their customers now? This bypasses the cadence and stamps the invoices as sent.';` +
-    'if(!confirm(msg)){return function(){};}' +
+    `if(!confirm('Email '+ids.length+' invoice(s) to their customers now? This bypasses the cadence and stamps the invoices as sent.')){return function(){};}` +
     `var target=document.getElementsByName('${F_SEND_IDS}');var form=null;` +
     `Array.prototype.forEach.call(target,function(t){t.value=ids.join(',');form=form||t.form;});` +
     `Array.prototype.forEach.call(document.getElementsByName('${F_ACTION}'),function(a){a.value='${ACTION_SEND}';});` +
@@ -170,7 +154,6 @@ function sendSelected(rawIds: string | undefined, state: PageState): serverWidge
       custpage_subsidiary: state.filters.subsidiaryId || '',
       custpage_daily: state.sendDaily ? 'T' : 'F',
       custpage_only_sending: state.onlySending ? 'T' : 'F',
-      [F_DRY_RUN]: state.dryRun ? 'T' : 'F',
     },
   });
   const summary = form.addField({ id: 'custpage_summary', type: serverWidget.FieldType.INLINEHTML, label: 'Summary' });
@@ -212,10 +195,10 @@ function sendSelected(rawIds: string | undefined, state: PageState): serverWidge
       taskType: task.TaskType.MAP_REDUCE,
       scriptId: SENDER_SCRIPT_ID,
       deploymentId: SELECTED_DEPLOYMENT_ID,
-      params: {
-        [PARAM.invoiceIds]: accepted.map((i) => i.invoiceid).join(','),
-        [PARAM.dryRun]: state.dryRun,
-      },
+      // Only the invoice ids are overridden. Dry Run is deliberately not passed: N/task drops a false
+      // override and the deployment's own (default-checked) Dry Run would win, so the Map/Reduce
+      // ignores Dry Run altogether whenever Invoice IDs is set.
+      params: { [PARAM.invoiceIds]: accepted.map((i) => i.invoiceid).join(',') },
     });
     taskId = mr.submit();
   } catch (e) {
@@ -227,10 +210,8 @@ function sendSelected(rawIds: string | undefined, state: PageState): serverWidge
   }
 
   const customers = new Set(accepted.map((i) => i.customerid)).size;
-  log.audit('Manual send queued', { user: `${user.name} (${user.id})`, taskId, dryRun: state.dryRun, invoices: accepted.map((i) => i.tranid) });
-  const mode = state.dryRun
-    ? `<p style="color:#a60;"><b>Dry run:</b> nothing will be emailed to customers and no invoice will be stamped. The digest (subject prefixed [DRY RUN]) and the execution log show what would have been sent. Uncheck Dry Run on the preview to send for real.</p>`
-    : `<p>The selected invoices are being emailed to their customers and stamped as sent. The digest reports the result.</p>`;
+  log.audit('Manual send queued', { user: `${user.name} (${user.id})`, taskId, invoices: accepted.map((i) => i.tranid) });
+  const mode = `<p>The selected invoices are being emailed to their customers and stamped as sent. The digest reports the result.</p>`;
   return page(
     `<p><b>Queued ${accepted.length} invoice(s) for ${customers} customer(s).</b> Task id ${escapeHtml(taskId)}.</p>` +
       mode +
